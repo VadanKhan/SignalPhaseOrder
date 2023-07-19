@@ -1,43 +1,67 @@
 import numpy as np
+from scipy.optimize import curve_fit
 
 
-def check_order(signals):
+def check_function(x, y):
     """
-    Checks if the given signals are in the correct order.
+    Checks if the given array represents one of several possible functions.
 
-    This function takes a list of signals as input, and returns True if the signals are in the correct order, and False
-        otherwise. The correct order is determined by the phase difference between the signals. If the signals are not in
-        the correct order, the function prints instructions on how to get them in the correct order. This function
-        requires the signals to be in order of increasing phase.
+    This function takes a 1D numpy array of x values and a 1D numpy array of y values as input, and returns the name of
+    the function that best fits the input data. The possible functions are "tan", "-tan", "sin^2", "cos^2", "-sin^2",
+    and "-cos^2".
 
     Parameters
     ----------
-    signals : list of array_like
-        The list of signals to be checked.
+    x : array_like
+        The x values of the input array.
+    y : array_like
+        The y values of the input array.
 
     Returns
     -------
-    bool
-        True if the signals are in the correct order, and False otherwise.
+    str
+        The name of the function that best fits the input data.
     """
-    phases = [np.arctan2(signal[1], signal[0]) for signal in signals]
-    if np.all(np.diff(phases) > 0):
-        return True
-    else:
-        sorted_indices = np.argsort(phases)
-        print("To get the signals in the correct order, rearrange them as follows:")
-        for i, index in enumerate(sorted_indices):
-            print(f"Signal {i+1}: Signal {index+1}")
-        return False
+
+    def tan_func(x, amplitude, frequency, phase, offset):
+        return amplitude * np.tan(frequency * x + phase) + offset
+
+    def sin2_func(x, amplitude, frequency, phase, offset):
+        return amplitude * np.sin(frequency * x + phase) ** 2 + offset
+
+    def cos2_func(x, amplitude, frequency, phase, offset):
+        return amplitude * np.cos(frequency * x + phase) ** 2 + offset
+
+    # Fit each function to the data and calculate MSE
+    mse_values = []
+
+    for func in [tan_func, sin2_func, cos2_func]:
+        try:
+            popt, _ = curve_fit(func, x, y)
+            y_fit = func(x, *popt)
+            mse = np.mean((y - y_fit) ** 2)
+            mse_values.append(mse)
+            mse_values.append(mse)  # same MSE for negative version of function
+        except RuntimeError:
+            mse_values.append(np.inf)
+            mse_values.append(np.inf)
+
+    # Find function with smallest MSE
+    function_names = ["tan", "-tan", "sin^2", "-sin^2", "cos^2", "-cos^2"]
+
+    min_index = np.argmin(mse_values)
+
+    return function_names[min_index]
 
 
-# Example usage
-signal1 = np.sin(np.linspace(0, 2 * np.pi, 100))
-signal2 = np.sin(np.linspace(0, 2 * np.pi, 100) + np.pi / 2)
-signal3 = np.sin(np.linspace(0, 2 * np.pi, 100) + np.pi)
-signal4 = np.sin(np.linspace(0, 2 * np.pi, 100) + 3 * np.pi / 2)
+x = np.linspace(-np.pi / 2, np.pi / 2, 100)
+y = -np.tan(x)
 
-signals = [signal1, signal2, signal3, signal4]
+result = check_function(x, y)
 
-print(check_order(signals))  # True
-print(check_order(signals[::-1]))  # False
+if result == "tan":
+    print("The input array represents tan(x).")
+elif result == "-tan":
+    print("The input array represents -tan(x).")
+else:
+    print("The input array does not clearly represent either tan(x) or -tan(x).")
